@@ -1,0 +1,199 @@
+openapi: 3.0.3
+info:
+  title: AuthService API
+  description: API para autenticación, registro y validación de clientes
+  version: 1.0.0
+servers:
+  - url: 'http://localhost:8083'
+    description: Servidor de desarrollo local
+
+tags:
+  - name: Authentication
+    description: Operaciones de autenticación, registro y validación
+
+paths:
+  /api/auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login de usuario
+      description: Autenticación de usuario y generación de token JWT
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login exitoso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Credenciales inválidas
+        '500':
+          description: Error interno del servidor
+
+  /api/auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Registro de cliente
+      description: Registro de un nuevo cliente (personal o empresarial)
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Cliente registrado correctamente
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: Datos de entrada incorrectos o usuario ya existente
+        '500':
+          description: Error interno del servidor
+
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          description: Email de usuario
+        password:
+          type: string
+          description: Contraseña del usuario
+          format: password
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: Token JWT generado
+
+    RegisterRequest:
+      type: object
+      discriminator:
+        propertyName: type
+        mapping:
+          personal: '#/components/schemas/PersonalCustomerRequest'
+          business: '#/components/schemas/BusinessCustomerRequest'
+      properties:
+        id:
+          type: string
+          readOnly: true
+          pattern: '^[a-zA-Z0-9-]+$'
+          maxLength: 36
+          example: "cust-123456"
+          description: Identificador único del cliente
+        subtype:
+          $ref: '#/components/schemas/CustomerSubtype'
+        name:
+          type: string
+          minLength: 2
+          maxLength: 50
+          description: Nombre(s) con primera letra mayúscula
+          example: "Juan"
+        email:
+          type: string
+          format: email
+          pattern: '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+          maxLength: 100
+          description: Correo electrónico válido
+          example: "juan.perez@ejemplo.com"
+        phone:
+          type: string
+          pattern: '^(\+51|51)?[9][0-9]{8}$'
+          minLength: 9
+          maxLength: 12
+          description: Número de teléfono peruano (9 dígitos con prefijo opcional +51)
+          example: "+51987654321"
+        address:
+          type: string
+          minLength: 5
+          maxLength: 200
+          description: Dirección completa
+          example: "Av. Arequipa 123, Lima"
+        type:
+          type: string
+          enum:
+            - personal
+            - business
+          description: Tipo de cliente
+          example: "personal"
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 20
+          description: Contraseña del cliente (mínimo 8 caracteres)
+          example: "Contraseña123"
+      required:
+        - name
+        - email
+        - type
+        - phone
+        - address
+        - password
+
+    PersonalCustomerRequest:
+      allOf:
+        - $ref: '#/components/schemas/RegisterRequest'
+        - type: object
+          properties:
+            dni:
+              type: string
+              description: Documento Nacional de Identidad - 8 dígitos
+              minLength: 8
+              maxLength: 8
+              pattern: '^[0-9]{8}$'
+              example: "12345678"
+          required:
+            - dni
+
+    BusinessCustomerRequest:
+      allOf:
+        - $ref: '#/components/schemas/RegisterRequest'
+        - type: object
+          properties:
+            ruc:
+              type: string
+              description: Registro Único de Contribuyentes - 11 dígitos, comienza con 10 o 20
+              minLength: 11
+              maxLength: 11
+              pattern: '^(10|20)[0-9]{9}$'
+              example: "20123456789"
+          required:
+            - ruc
+
+    CustomerSubtype:
+      type: string
+      enum:
+        - regular
+        - vip
+        - pyme
+      description: Subtipos disponibles para clientes personales
+
